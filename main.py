@@ -29,6 +29,8 @@ from tools.engine_proto import train_one_epoch, evaluate
 from tools.preprocess import mean, std
 from tools.datasets import build_dataset
 from tools.utils import str2bool
+from tools.loss import Entailment
+import wandb
 
 
 def get_args_parser():
@@ -55,7 +57,7 @@ def get_args_parser():
     parser.add_argument('--ppc_cov_thresh', type=float, default=1.)
     parser.add_argument('--ppc_mean_thresh', type=float, default=2.)
     parser.add_argument('--global_coe', type=float, default=0.5)
-    parser.add_argument('--global_proto_per_class', type=int, default=5)
+    parser.add_argument('--global_proto_per_class', type=int, default=1)
     parser.add_argument('--ppc_cov_coe', type=float, default=0.1)
     parser.add_argument('--ppc_mean_coe', type=float, default=0.5)
 
@@ -114,8 +116,8 @@ def get_args_parser():
     parser.add_argument('--lr-noise-std', type=float, default=1.0, metavar='STDDEV',
                         help='learning rate noise std-dev (default: 1.0)')
     parser.add_argument('--warmup-lr', type=float, default=1e-6, metavar='LR',
-                        help='warmup learning rate (default: 1e-6)')
-    parser.add_argument('--min-lr', type=float, default=1e-5, metavar='LR',
+                        help='warmup learning rate (default: 1e-5)')
+    parser.add_argument('--min-lr', type=float, default=1e-6, metavar='LR',
                         help='lower lr bound for cyclic schedulers that hit 0 (1e-5)')
 
     parser.add_argument('--decay-epochs', type=float, default=30, metavar='N',
@@ -250,6 +252,12 @@ def set_seed(seed):
 
 
 def main(args):
+
+    wandb.init(
+        project="Hyperbolic_Hierarchical_ProtoNet",  # Name of your project on wandb
+        name="ProtoPFormer_Hyper_No_Crop",          # Name of the specific run/experiment
+        entity="rcl_stroke"
+    )
     # fix the seed for reproducibility
     seed = args.seed + utils.get_rank()
     set_seed(seed)
@@ -380,6 +388,7 @@ def main(args):
     lr_scheduler, _ = create_scheduler(args, optimizer)
 
     criterion = LabelSmoothingCrossEntropy()
+    entailment_loss = Entailment(num_classes=args.nb_classes, loss_weight=0.2)
 
     if args.mixup > 0.:
         # smoothing is handled with mixup label transform
@@ -422,7 +431,7 @@ def main(args):
         train_stats = train_one_epoch(
             model=model, criterion=criterion, data_loader=data_loader_train,
             optimizer=optimizer, device=device, epoch=epoch, loss_scaler=loss_scaler,
-            max_norm=args.clip_grad, model_ema=model_ema, mixup_fn=mixup_fn,
+            max_norm=args.clip_grad, ent_loss=entailment_loss, model_ema=model_ema, mixup_fn=mixup_fn,
             args=args, tb_writer=tb_writer, iteration=__global_values__["it"],
             # set_training_mode=args.finetune == ''  # keep in eval mode during finetuning
         )

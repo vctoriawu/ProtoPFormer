@@ -321,11 +321,14 @@ def build_transform(is_train, args):
 
     t = []
     if resize_im:
-        size = int((256 / 224) * args.input_size)
+        t.append(
+            transforms.Resize((224, 224), interpolation=3)  # Directly resize to 224x224
+        )
+        '''size = int((256 / 224) * args.input_size)
         t.append(
             transforms.Resize(size, interpolation=3),  # to maintain same ratio w.r.t. 224 images
         )
-        t.append(transforms.CenterCrop(args.input_size))
+        t.append(transforms.CenterCrop(args.input_size))'''
 
     t.append(transforms.ToTensor())
     if args.data_set in ['FashionMNIST', 'MNIST']:
@@ -407,6 +410,7 @@ class Cub2011(Dataset):
 
     def __init__(self, root, train=True, transform=None, loader=default_loader, download=False):
         self.root = os.path.expanduser(root)
+        print(self.root)
         self.transform = transform
         self.loader = default_loader
         self.train = train
@@ -419,6 +423,7 @@ class Cub2011(Dataset):
                                ' You can use download=True to download it')
 
     def _load_metadata(self):
+        
         images = pd.read_csv(os.path.join(self.root, 'CUB_200_2011', 'images.txt'), sep=' ',
                              names=['img_id', 'filepath'])
         image_class_labels = pd.read_csv(os.path.join(self.root, 'CUB_200_2011', 'image_class_labels.txt'),

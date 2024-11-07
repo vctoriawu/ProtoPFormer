@@ -2,7 +2,7 @@
 
 export PYTHONPATH=./:$PYTHONPATH
 # export CUDA_VISIBLE_DEVICES=0,1,2,3
-export CUDA_VISIBLE_DEVICES=4,5,6,7
+export CUDA_VISIBLE_DEVICES=0,2
 
 # model=deit_tiny_patch16_224
 # model=deit_small_patch16_224
@@ -18,7 +18,7 @@ seed=1028
 
 # Learning Rate
 warmup_lr=1e-4
-warmup_epochs=5
+warmup_epochs=0
 features_lr=1e-4
 add_on_layers_lr=3e-3
 prototype_vectors_lr=3e-3
@@ -27,7 +27,7 @@ prototype_vectors_lr=3e-3
 opt=adamw
 sched=cosine
 decay_epochs=10
-decay_rate=0.1
+decay_rate=0.9
 weight_decay=0.05
 epochs=200
 output_dir=output_cosine/
@@ -60,7 +60,7 @@ ft=protopformer
 for data_set in CUB2011U;
 do
     prototype_num=2000
-    data_path=datasets
+    data_path=/workspace/Hyperbolic_Hierarchical_Protonet_dev/data
     python -m torch.distributed.launch --nproc_per_node=$num_gpus --master_port=$use_port --use_env main.py \
         --base_architecture=$model \
         --data_set=$data_set \

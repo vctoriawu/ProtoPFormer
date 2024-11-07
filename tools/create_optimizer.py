@@ -31,14 +31,14 @@ def split_weights(model, joint_optimizer_lrs, weight_decay=None, skip_list=[]):
         [{'params': model.features.parameters(), 'lr': joint_optimizer_lrs['features'], 'weight_decay': 1e-3}, # bias are now also being regularized
         {'params': model.add_on_layers.parameters(), 'lr': joint_optimizer_lrs['add_on_layers'], 'weight_decay': 1e-3},
         ]
-        # if hasattr(model, 'last_layer'):
-        #     res_params.append({'params': model.last_layer.parameters(), 'lr': joint_optimizer_lrs['prototype_vectors']})
+        #if hasattr(model, 'last_layer'):
+        #    res_params.append({'params': model.last_layer.parameters(), 'lr': joint_optimizer_lrs['prototype_vectors']})
         if hasattr(model, 'prototype_vectors'):
             res_params.append({'params': model.prototype_vectors, 'lr': joint_optimizer_lrs['prototype_vectors']})
         if hasattr(model, 'prototype_vectors_global'):
             res_params.append({'params': model.prototype_vectors_global, 'lr': joint_optimizer_lrs['prototype_vectors']})
     else:
-        for module_name in ['features', 'add_on_layers', 'last_layer']:
+        for module_name in ['features', 'add_on_layers']:#, 'last_layer']:
             module = getattr(model, module_name)
             for name, param in module.named_parameters():
                 decay, no_decay = [], []
@@ -50,7 +50,8 @@ def split_weights(model, joint_optimizer_lrs, weight_decay=None, skip_list=[]):
                     decay.append(param)
             res_params.append({'params': no_decay, 'lr': joint_optimizer_lrs[module_name], 'weight_decay': 0.})
             res_params.append({'params': decay, 'lr': joint_optimizer_lrs[module_name], 'weight_decay': weight_decay})
-        res_params.append({'params': model.prototype_vectors, 'lr': joint_optimizer_lrs['prototype_vectors'], 'weight_decay': weight_decay})
+        res_params.append({'params': model.prototype_vectors, 'lr': joint_optimizer_lrs['prototype_vectors']})#, 'weight_decay': weight_decay})
+        res_params.append({'params': model.prototype_vectors_global, 'lr': joint_optimizer_lrs['prototype_vectors']})
     return res_params
 
 
@@ -67,7 +68,7 @@ def create_optimizer(args, model, joint_optimizer_lrs=None, filter_bias_and_bn=T
     #     parameters = model.parameters()
 
     if joint_optimizer_lrs is not None:
-        # parameters = split_weights(model, joint_optimizer_lrs, weight_decay)
+        #parameters = split_weights(model, joint_optimizer_lrs, weight_decay)
         parameters = split_weights(model, joint_optimizer_lrs)
     else:
         parameters = model.parameters()
