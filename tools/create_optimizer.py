@@ -39,6 +39,10 @@ def split_weights(model, joint_optimizer_lrs, weight_decay=None, skip_list=[]):
             res_params.append({'params': model.prototype_vectors, 'lr': joint_optimizer_lrs['prototype_vectors']})
         if hasattr(model, 'prototype_vectors_global'):
             res_params.append({'params': model.prototype_vectors_global, 'lr': joint_optimizer_lrs['prototype_vectors']})
+        if hasattr(model, 'curv'):
+            res_params.append({'params': model.curv, 'lr': joint_optimizer_lrs['curv']})
+        if hasattr(model, 'visual_alpha'):
+            res_params.append({'params': model.visual_alpha, 'lr': joint_optimizer_lrs['visual_alpha']})
     else:
         for module_name in ['features', 'add_on_layers', 'last_layer', 'last_layer_global']:
             module = getattr(model, module_name)
@@ -54,6 +58,8 @@ def split_weights(model, joint_optimizer_lrs, weight_decay=None, skip_list=[]):
             res_params.append({'params': decay, 'lr': joint_optimizer_lrs[module_name], 'weight_decay': weight_decay})
         res_params.append({'params': model.prototype_vectors, 'lr': joint_optimizer_lrs['prototype_vectors']})#, 'weight_decay': weight_decay})
         res_params.append({'params': model.prototype_vectors_global, 'lr': joint_optimizer_lrs['prototype_vectors']})
+        res_params.append({'params': model.curv, 'lr': joint_optimizer_lrs['curv']})
+        res_params.append({'params': model.visual_alpha, 'lr': joint_optimizer_lrs['visual_alpha']})
     return res_params
 
 

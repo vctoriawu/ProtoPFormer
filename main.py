@@ -69,6 +69,8 @@ def get_args_parser():
     parser.add_argument('--prototype_vectors_lr', type=float, default=3e-3)
     parser.add_argument('--last_layer_lr', type=float, default=1e-4)
     parser.add_argument('--last_layer_global_lr', type=float, default=1e-4)
+    parser.add_argument('--curv_lr', type=float, default=5e-4)
+    parser.add_argument('--visual_alpha_lr', type=float, default=5e-4)
     parser.add_argument('--joint_lr_step_size', type=int, default=5)
 
     parser.add_argument('--coefs_crs_ent', type=float, default=1)
@@ -390,6 +392,8 @@ def main(args):
         'prototype_vectors': args.prototype_vectors_lr,
         'last_layer': args.last_layer_lr,
         'last_layer_global': args.last_layer_global_lr,
+        'curv': args.curv_lr,
+        'visual_alpha': args.visual_alpha_lr,
     }
 
     model_without_ddp = model
