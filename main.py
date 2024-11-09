@@ -67,6 +67,8 @@ def get_args_parser():
     parser.add_argument('--features_lr', type=float, default=1e-4)
     parser.add_argument('--add_on_layers_lr', type=float, default=3e-3)
     parser.add_argument('--prototype_vectors_lr', type=float, default=3e-3)
+    parser.add_argument('--last_layer_lr', type=float, default=1e-4)
+    parser.add_argument('--last_layer_global_lr', type=float, default=1e-4)
     parser.add_argument('--joint_lr_step_size', type=int, default=5)
 
     parser.add_argument('--coefs_crs_ent', type=float, default=1)
@@ -382,9 +384,13 @@ def main(args):
             device='cpu' if args.model_ema_force_cpu else '',
             resume='')
 
-    joint_optimizer_lrs = {'features': args.features_lr,
-                        'add_on_layers': args.add_on_layers_lr,
-                        'prototype_vectors': args.prototype_vectors_lr,}
+    joint_optimizer_lrs = {
+        'features': args.features_lr,
+        'add_on_layers': args.add_on_layers_lr,
+        'prototype_vectors': args.prototype_vectors_lr,
+        'last_layer': args.last_layer_lr,
+        'last_layer_global': args.last_layer_global_lr,
+    }
 
     model_without_ddp = model
     if args.distributed:

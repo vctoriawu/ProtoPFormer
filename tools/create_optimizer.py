@@ -31,14 +31,16 @@ def split_weights(model, joint_optimizer_lrs, weight_decay=None, skip_list=[]):
         [{'params': model.features.parameters(), 'lr': joint_optimizer_lrs['features'], 'weight_decay': 1e-3}, # bias are now also being regularized
         {'params': model.add_on_layers.parameters(), 'lr': joint_optimizer_lrs['add_on_layers'], 'weight_decay': 1e-3},
         ]
-        #if hasattr(model, 'last_layer'):
-        #    res_params.append({'params': model.last_layer.parameters(), 'lr': joint_optimizer_lrs['prototype_vectors']})
+        if hasattr(model, 'last_layer'):
+            res_params.append({'params': model.last_layer.parameters(), 'lr': joint_optimizer_lrs['last_layer']})
+        if hasattr(model, 'last_layer_global'):
+            res_params.append({'params': model.last_layer_global.parameters(), 'lr': joint_optimizer_lrs['last_layer_global']})
         if hasattr(model, 'prototype_vectors'):
             res_params.append({'params': model.prototype_vectors, 'lr': joint_optimizer_lrs['prototype_vectors']})
         if hasattr(model, 'prototype_vectors_global'):
             res_params.append({'params': model.prototype_vectors_global, 'lr': joint_optimizer_lrs['prototype_vectors']})
     else:
-        for module_name in ['features', 'add_on_layers']:#, 'last_layer']:
+        for module_name in ['features', 'add_on_layers', 'last_layer', 'last_layer_global']:
             module = getattr(model, module_name)
             for name, param in module.named_parameters():
                 decay, no_decay = [], []

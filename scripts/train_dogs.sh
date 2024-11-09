@@ -24,6 +24,8 @@ warmup_epochs=5
 features_lr=5e-5
 add_on_layers_lr=3e-3
 prototype_vectors_lr=3e-3
+last_layer_lr=1e-4
+last_layer_global_lr=1e-4
 
 # Optimizer & Scheduler
 opt=adamw
@@ -85,6 +87,8 @@ do
         --features_lr=$features_lr \
         --add_on_layers_lr=$add_on_layers_lr \
         --prototype_vectors_lr=$prototype_vectors_lr \
+        --last_layer_lr=$last_layer_lr \
+        --last_layer_global_lr=$last_layer_global_lr \
         --prototype_shape $prototype_num $dim 1 1 \
         --reserve_layers $reserve_layer_idx \
         --reserve_token_nums $last_reserve_num \
