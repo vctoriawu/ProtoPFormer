@@ -125,16 +125,17 @@ class PPNet(nn.Module):
         self.ones = nn.Parameter(torch.ones(self.prototype_shape),
                                  requires_grad=False)
 
-        '''self.last_layer = nn.Linear(self.num_prototypes, self.num_classes,
+        # '''
+        self.last_layer = nn.Linear(self.num_prototypes, self.num_classes,
                                     bias=False) # do not use bias
         self.last_layer_global = nn.Linear(self.num_prototypes_global, self.num_classes,
                                     bias=False) # do not use bias
         self.last_layer.weight.requires_grad = True # why was this false
         self.last_layer_global.weight.requires_grad = True
-        '''
-        self.last_layer = nn.Linear(self.num_prototypes+self.num_prototypes_global, self.num_classes,
-                                    bias=False) # do not use bias
-        self.last_layer.weight.requires_grad = True # why was this false
+        # '''
+        # self.last_layer = nn.Linear(self.num_prototypes+self.num_prototypes_global, self.num_classes,
+        #                             bias=False) # do not use bias
+        # self.last_layer.weight.requires_grad = True # why was this false
 
         self.all_attn_mask = None
         self.teacher_model = None
@@ -193,7 +194,7 @@ class PPNet(nn.Module):
             img_tokens = img_tokens.permute(0, 2, 1).reshape(B, dim, fea_height, fea_width) # (batch_size, dim, fea_size, fea_size)
         else:
             x = self.features(x)
-        
+
         cls_tokens = self.add_on_layers(cls_tokens)
         img_tokens = self.add_on_layers(img_tokens)
         return (cls_tokens, img_tokens), (token_attn, cls_token_attn, None)
@@ -350,13 +351,13 @@ class PPNet(nn.Module):
                 global_activations, _ = self.get_activations(cls_tokens, self.prototype_vectors_global, global_feat_prot_lorentz_distance, 'global')
                 local_activations, (distances, _) = self.get_activations(img_tokens, self.prototype_vectors, part_feat_prot_lorentz_distance, 'local')
 
-                prototype_activations = torch.cat([local_activations, global_activations], dim=-1)
-                logits = self.last_layer(prototype_activations)  # shape (N, num_classes)
+                # prototype_activations = torch.cat([local_activations, global_activations], dim=-1)
+                # logits = self.last_layer(prototype_activations)  # shape (N, num_classes)
 
-                #logits_global = self.last_layer_global(global_activations)
-                #logits_local = self.last_layer(local_activations)
-                #logits = self.global_coe * logits_global + (1. - self.global_coe) * logits_local
-                return logits, (cls_token_attn, distances, logits, logits) #logits_global, logits_local)
+                logits_global = self.last_layer_global(global_activations)
+                logits_local = self.last_layer(local_activations)
+                logits = self.global_coe * logits_global + (1. - self.global_coe) * logits_local
+                return logits, (cls_token_attn, distances, logits_global, logits_local)
 
         # re-calculate distances
         if self.use_global:
@@ -369,12 +370,12 @@ class PPNet(nn.Module):
             global_activations, _ = self.get_activations(cls_tokens, self.prototype_vectors_global, global_feat_prot_lorentz_distance, 'global')
             local_activations, (_, total_proto_act) = self.get_activations(img_tokens, self.prototype_vectors, part_feat_prot_lorentz_distance, 'local')
 
-            prototype_activations = torch.cat([local_activations, global_activations], dim=-1)
-            logits = self.last_layer(prototype_activations)  # shape (N, num_classes)
+            # prototype_activations = torch.cat([local_activations, global_activations], dim=-1)
+            # logits = self.last_layer(prototype_activations)  # shape (N, num_classes)
 
-            #logits_global = self.last_layer_global(global_activations)
-            #logits_local = self.last_layer(local_activations)
-            #logits = self.global_coe * logits_global + (1. - self.global_coe) * logits_local
+            logits_global = self.last_layer_global(global_activations)
+            logits_local = self.last_layer(local_activations)
+            logits = self.global_coe * logits_global + (1. - self.global_coe) * logits_local
         else:
             distances, (student_token_attn, _, _), global_feat_prot_lorentz_distance, part_feat_prot_lorentz_distance = self.prototype_distances(x, reserve_layer_nums, 'local')
             # global min pooling
@@ -434,11 +435,12 @@ class PPNet(nn.Module):
 
         correct_class_connection = 1
         incorrect_class_connection = incorrect_strength
-        self.last_layer.weight[:,:self.num_prototypes].data.copy_(
+        # self.last_layer.weight[:,:self.num_prototypes].data.copy_(
+        self.last_layer.weight.data.copy_(
             correct_class_connection * positive_one_weights_locations
             + incorrect_class_connection * negative_one_weights_locations)
 
-        '''if hasattr(self, 'last_layer_global'):
+        if hasattr(self, 'last_layer_global'):
             positive_one_weights_locations = torch.t(self.prototype_class_identity_global)
             negative_one_weights_locations = 1 - positive_one_weights_locations
 
@@ -452,6 +454,7 @@ class PPNet(nn.Module):
         self.last_layer.weight[:,self.num_prototypes:].data.copy_(
             correct_class_connection * positive_one_weights_locations
             + incorrect_class_connection * negative_one_weights_locations)
+        '''
 
     def _initialize_weights(self):
         for m in self.add_on_layers.modules():

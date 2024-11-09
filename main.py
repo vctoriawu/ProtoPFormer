@@ -260,9 +260,9 @@ def main(args):
 
     wandb.init(
         project="Hyperbolic_Hierarchical_ProtoNet",  # Name of your project on wandb
-        name="ProtoPFormer_Hyper_No_Crop",          # Name of the specific run/experiment
         config=args,
         mode=args.wandb_mode,  # one of "online", "offline" or "disabled"
+        name="ProtoPFormer_Hyper_fusedLastLayer",          # Name of the specific run/experiment
         entity="rcl_stroke"
     )
     # define a metric we are interested in the maximum of
