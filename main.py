@@ -36,6 +36,7 @@ import wandb
 def get_args_parser():
     parser = argparse.ArgumentParser('Vision Transformer KD training and evaluation script',
                         add_help=False)
+    parser.add_argument('--wandb_mode', type=str, default='online')
     parser.add_argument('--batch_size', default=256, type=int)
     # parser.add_argument('--distill', type=bool, default=False)
     parser.add_argument('--distillw', type=float, default=0.5, help='distill rate (default: 0.5)')
@@ -256,8 +257,20 @@ def main(args):
     wandb.init(
         project="Hyperbolic_Hierarchical_ProtoNet",  # Name of your project on wandb
         name="ProtoPFormer_Hyper_No_Crop",          # Name of the specific run/experiment
+        config=args,
+        mode=args.wandb_mode,  # one of "online", "offline" or "disabled"
         entity="rcl_stroke"
     )
+    # define a metric we are interested in the maximum of
+    wandb.define_metric("train/acc1", summary="max")
+    wandb.define_metric("train/acc5", summary="max")
+    wandb.define_metric("train/global_acc1", summary="max")
+    wandb.define_metric("train/local_acc1", summary="max")
+    wandb.define_metric("test/acc1", summary="max")
+    wandb.define_metric("test/acc5", summary="max")
+    wandb.define_metric("test/global_acc1", summary="max")
+    wandb.define_metric("test/local_acc1", summary="max")
+
     # fix the seed for reproducibility
     seed = args.seed + utils.get_rank()
     set_seed(seed)

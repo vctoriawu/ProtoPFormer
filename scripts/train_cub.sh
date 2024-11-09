@@ -13,6 +13,8 @@ model=$1
 batch_size=$2
 num_gpus=$3
 
+wandb_mode="online" # one of "online", "offline" or "disabled"
+
 use_port=2672
 seed=1028
 
@@ -62,6 +64,7 @@ do
     prototype_num=2000
     data_path=/workspace/Hyperbolic_Hierarchical_Protonet_dev/data
     python -m torch.distributed.launch --nproc_per_node=$num_gpus --master_port=$use_port --use_env main.py \
+        --wandb_mode=$wandb_mode \
         --base_architecture=$model \
         --data_set=$data_set \
         --data_path=$data_path \

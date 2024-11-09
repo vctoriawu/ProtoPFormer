@@ -185,7 +185,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: _Loss,
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
     # Log each averaged metric to WandB
-    wandb.log({f'train/{k}': meter.global_avg for k, meter in metric_logger.meters.items()})
+    if args.wandb_mode != "disabled":
+        wandb.log({f'train/{k}': meter.global_avg for k, meter in metric_logger.meters.items()})
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
 
 
@@ -258,5 +259,6 @@ def evaluate(data_loader, model, device, args):
     logger.info('* Acc@1 {top1.global_avg:.3f} Acc@5 {top5.global_avg:.3f} loss {losses.global_avg:.3f}'
           .format(top1=metric_logger.acc1, top5=metric_logger.acc5, losses=metric_logger.loss))
     # Log each averaged metric to WandB
-    wandb.log({f'test/{k}': meter.global_avg for k, meter in metric_logger.meters.items()})
+    if args.wandb_mode != "disabled":
+        wandb.log({f'test/{k}': meter.global_avg for k, meter in metric_logger.meters.items()})
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
