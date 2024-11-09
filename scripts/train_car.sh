@@ -14,6 +14,7 @@ batch_size=$2
 num_gpus=$3
 
 wandb_mode="online" # one of "online", "offline" or "disabled"
+run_name="ProtoPFormer_Hyper-CARS-0"
 
 use_port=2673
 seed=1028
@@ -70,11 +71,12 @@ do
     
     python -m torch.distributed.launch --nproc_per_node=$num_gpus --master_port=$use_port --use_env main.py \
         --wandb_mode=$wandb_mode \
+        --run_name=$run_name \
         --base_architecture=$model \
         --data_set=$data_set \
         --data_path=$data_path \
         --input_size=$input_size \
-        --output_dir=$output_dir/$data_set/$model/$seed-$lr-$opt-$weight_decay-$epochs-$ft \
+        --output_dir=$output_dir/$data_set/$model/$run_name/$seed-$lr-$opt-$weight_decay-$epochs-$ft \
         --model=$model \
         --batch_size=$batch_size \
         --seed=$seed \

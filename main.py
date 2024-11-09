@@ -36,6 +36,7 @@ import wandb
 def get_args_parser():
     parser = argparse.ArgumentParser('Vision Transformer KD training and evaluation script',
                         add_help=False)
+    parser.add_argument('--run_name', type=str, default='ProtoPFormer_Hyper-Train')
     parser.add_argument('--wandb_mode', type=str, default='online')
     parser.add_argument('--batch_size', default=256, type=int)
     # parser.add_argument('--distill', type=bool, default=False)
@@ -262,7 +263,7 @@ def main(args):
         project="Hyperbolic_Hierarchical_ProtoNet",  # Name of your project on wandb
         config=args,
         mode=args.wandb_mode,  # one of "online", "offline" or "disabled"
-        name="ProtoPFormer_Hyper_fusedLastLayer",          # Name of the specific run/experiment
+        name=None if args.run_name == "" else args.run_name,           # Name of the specific run/experiment
         entity="rcl_stroke"
     )
     # define a metric we are interested in the maximum of
