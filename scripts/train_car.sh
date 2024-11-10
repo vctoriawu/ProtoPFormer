@@ -40,6 +40,8 @@ epochs=200
 output_dir=output_cosine/
 input_size=224
 
+prototype_activation_function="log"
+entailment_coe=0.2  # entailment loss coefficient
 use_global=True
 use_ppc_loss=True       # Whether use PPC loss
 last_reserve_num=121    # Number of reserve tokens in the last layer
@@ -99,6 +101,8 @@ do
         --prototype_shape $prototype_num $dim 1 1 \
         --reserve_layers $reserve_layer_idx \
         --reserve_token_nums $last_reserve_num \
+        --prototype_activation_function=$prototype_activation_function \
+        --entailment_coe=$entailment_coe \
         --use_global=$use_global \
         --use_ppc_loss=$use_ppc_loss \
         --ppc_cov_thresh=$ppc_cov_thresh \

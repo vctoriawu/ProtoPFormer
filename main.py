@@ -59,6 +59,7 @@ def get_args_parser():
     parser.add_argument('--ppc_cov_thresh', type=float, default=1.)
     parser.add_argument('--ppc_mean_thresh', type=float, default=2.)
     parser.add_argument('--global_coe', type=float, default=0.5)
+    parser.add_argument('--entailment_coe', type=float, default=0.2)
     parser.add_argument('--global_proto_per_class', type=int, default=1)
     parser.add_argument('--ppc_cov_coe', type=float, default=0.1)
     parser.add_argument('--ppc_mean_coe', type=float, default=0.5)
@@ -412,7 +413,7 @@ def main(args):
     lr_scheduler, _ = create_scheduler(args, optimizer)
 
     criterion = LabelSmoothingCrossEntropy()
-    entailment_loss = Entailment(num_classes=args.nb_classes, loss_weight=0.2)
+    entailment_loss = Entailment(num_classes=args.nb_classes, loss_weight=args.entailment_coe)
 
     if args.mixup > 0.:
         # smoothing is handled with mixup label transform
