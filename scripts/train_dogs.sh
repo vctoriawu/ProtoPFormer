@@ -21,6 +21,7 @@ seed=1028
 
 # Learning Rate
 warmup_lr=1e-4
+min_lr=1e-6
 warmup_epochs=5
 features_lr=5e-5
 add_on_layers_lr=3e-3
@@ -86,6 +87,7 @@ do
         --sched=$sched \
         --warmup-epochs=$warmup_epochs \
         --warmup-lr=$warmup_lr \
+        --min_lr=$min_lr \
         --decay-epochs=$decay_epochs \
         --decay-rate=$decay_rate \
         --weight_decay=$weight_decay \
