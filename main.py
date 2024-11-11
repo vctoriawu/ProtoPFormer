@@ -54,6 +54,7 @@ def get_args_parser():
     parser.add_argument('--baseline_path', type=str, default=None)
     parser.add_argument('--reserve_layers', nargs='+', type=int, default=[])
     parser.add_argument('--reserve_token_nums', nargs='+', type=int, default=[])
+    parser.add_argument('--feat_range_type', type=str, default="Sigmoid")
     parser.add_argument('--use_global', type=str2bool, default=False)
     parser.add_argument('--use_ppc_loss', type=str2bool, default=False)
     parser.add_argument('--ppc_cov_thresh', type=float, default=1.)
@@ -368,6 +369,7 @@ def main(args):
                                 num_classes=args.nb_classes,
                                 reserve_layers=args.reserve_layers,
                                 reserve_token_nums=args.reserve_token_nums,
+                                feat_range_type=args.feat_range_type,  # can be "Tanh" or "Sigmoid"
                                 use_global=args.use_global,
                                 use_ppc_loss=args.use_ppc_loss,
                                 ppc_cov_thresh=args.ppc_cov_thresh,

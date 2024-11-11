@@ -42,6 +42,7 @@ input_size=224
 
 prototype_activation_function="log"
 entailment_coe=0.2  # entailment loss coefficient
+feat_range_type="Sigmoid"   # can be "Tanh" or "Sigmoid"
 use_global=True
 use_ppc_loss=True   # Whether use PPC loss
 last_reserve_num=81 # Number of reserve tokens in the last layer
@@ -103,6 +104,7 @@ do
         --prototype_activation_function=$prototype_activation_function \
         --entailment_coe=$entailment_coe \
         --use_global=$use_global \
+        --feat_range_type=$feat_range_type \
         --use_ppc_loss=$use_ppc_loss \
         --ppc_cov_thresh=$ppc_cov_thresh \
         --ppc_mean_thresh=$ppc_mean_thresh \

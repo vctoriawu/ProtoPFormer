@@ -48,6 +48,7 @@
                 "--reserve_layers", "11",
                 "--reserve_token_nums", "81",
                 "--use_global", "True",
+                "--feat_range_type", "Sigmoid",
                 "--use_ppc_loss", "False",
                 "--ppc_cov_thresh", "1.",
                 "--ppc_mean_thresh", "2.",

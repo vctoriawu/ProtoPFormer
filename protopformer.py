@@ -17,6 +17,7 @@ class PPNet(nn.Module):
                  proto_layer_rf_info, num_classes,
                  reserve_layers=[],
                  reserve_token_nums=[],
+                 feat_range_type="Sigmoid",  # can be "Tanh" or "Sigmoid"
                  use_global=False,
                  use_ppc_loss=False,
                  ppc_cov_thresh=2.,
@@ -34,6 +35,7 @@ class PPNet(nn.Module):
         self.num_classes = num_classes
         self.reserve_layers = reserve_layers
         self.reserve_token_nums = reserve_token_nums
+        self.feat_range_type = feat_range_type
         self.use_global = use_global
         self.use_ppc_loss = use_ppc_loss
         self.ppc_cov_thresh = ppc_cov_thresh
@@ -111,13 +113,24 @@ class PPNet(nn.Module):
         else:
             self.add_on_layers = nn.Sequential(
                 nn.Conv2d(in_channels=first_add_on_layer_in_channels, out_channels=self.prototype_shape[1], kernel_size=1),
-                nn.Sigmoid()
-                )
+                # nn.ReLU(),
+                # nn.Conv2d(in_channels=self.prototype_shape[1], out_channels=self.prototype_shape[1], kernel_size=1),
+                # # TODO REMOVE SIGMOID?  Did that, it causes NAN! so we keep it
+                nn.__dict__[feat_range_type](),  # can be Sigmoid or Tanh
+            )
 
-        self.prototype_vectors = nn.Parameter(torch.rand(self.prototype_shape),
+
+        if feat_range_type == "Tanh":
+            random_init = "randn"
+        elif feat_range_type == "Sigmoid":
+            random_init = "rand"
+        else:
+            raise (ValueError(f"feat_range_type {self.feat_range_type} is not supported"))
+
+        self.prototype_vectors = nn.Parameter(torch.__dict__[random_init](self.prototype_shape),
                                               requires_grad=True)
         if self.use_global:
-            self.prototype_vectors_global = nn.Parameter(torch.rand(self.prototype_shape_global),
+            self.prototype_vectors_global = nn.Parameter(torch.__dict__[random_init](self.prototype_shape_global),
                                               requires_grad=True)
 
         # do not make this just a tensor,
@@ -463,7 +476,12 @@ class PPNet(nn.Module):
         for m in self.add_on_layers.modules():
             if isinstance(m, nn.Conv2d):
                 # every init technique has an underscore _ in the name
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                if self.feat_range_type == "Sigmoid":
+                    nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')  # for the relu and sigmoid
+                elif self.feat_range_type == "Tanh":
+                    nn.init.xavier_normal_(m.weight, gain=nn.init.calculate_gain('tanh'))  # for the tanh initialization
+                else:
+                    raise(ValueError(f"feat_range_type {self.feat_range_type} is not supported"))
 
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
@@ -534,6 +552,7 @@ def construct_PPNet(base_architecture, pretrained=True, img_size=224,
                     prototype_shape=(2000, 512, 1, 1), num_classes=200,
                     reserve_layers=[],
                     reserve_token_nums=[],
+                    feat_range_type="Sigmoid",  # can be "Tanh" or "Sigmoid"
                     use_global=False,
                     use_ppc_loss=False,
                     ppc_cov_thresh=1.,
@@ -554,6 +573,7 @@ def construct_PPNet(base_architecture, pretrained=True, img_size=224,
                  num_classes=num_classes,
                  reserve_layers=reserve_layers,
                  reserve_token_nums=reserve_token_nums,
+                 feat_range_type=feat_range_type,  # can be "Tanh" or "Sigmoid"
                  use_global=use_global,
                  use_ppc_loss=use_ppc_loss,
                  ppc_cov_thresh=ppc_cov_thresh,
