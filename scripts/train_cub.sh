@@ -2,50 +2,129 @@
 
 export PYTHONPATH=./:$PYTHONPATH
 # export CUDA_VISIBLE_DEVICES=0,1,2,3
-export CUDA_VISIBLE_DEVICES=0,2
+#export CUDA_VISIBLE_DEVICES=0
+
+####################  lessons learned overall
+### 1. large LR collapses! 5e-5 for the hyperbolic and last layer stuff is good!
+### 2. large entailment coefficient collapses. 0 also collapses.  0.01 and 0.1 are good
+### 3. large Batch_size slows down, and collapses too
+### 4. warmup slows down the learning, but also ends lower!
+### 5 some runs need  more epochs to finish training (still going up). maybe that + warmup?
+#     Warmup was worse! more epochs didn't help! Maybe modify the LR scheduler to go lower (so more time in low)
+#     or change the scheduler
+
+# NAN
+#run_name="ProtoPFormer_Hyper-CUB-fusedLastLayer-NoSigmoid_addOnLayers"
+
+# Collapse
+#run_name="ProtoPFormer_Hyper-CUB-fusedLastLayer"
+
+# not much gain! bad cluster and sep!
+#run_name="ProtoPFormer_Hyper-CUB-fusedLastLayer-Ent0-warmup"
+
+# fixed the cluster and sep of local prots!
+
+####################################################################################################
+######################################  with entailment ########################################
+####################################################################################################
+#sched=cosine
+
+# RESULT :    COLLAPSED AGAIN
+#run_name="ProtoPFormer_Hyper-CUB-FixedClstrSep"
+#######################################  Warm up  # RESULT   : Collapsed too! but after warmup was done!
+#run_name="ProtoPFormer_Hyper-CUB-FixedClstrSep_warmup"
+
+#######################################  lower LR and entailment
+#run_name="ProtoPFormer_Hyper-CUB-FixedClstrSep-Ent02-5e5LR"  # RESULT: Collapsed
+#run_name="ProtoPFormer_Hyper-CUB-FixedClstrSep-Ent02-linear-5e5LR"   # RESULT: Collapsed later at 20%!
+#run_name="ProtoPFormer_Hyper-CUB-FixedClstrSep-Ent02-linear-5e5LR-B128"   # RESULT: Collapsed later at 26%!
+#run_name="ProtoPFormer_Hyper-CUB-FixedClstrSep-Ent01-5e5LR"  # RESULT: Collapsed
+#run_name="ProtoPFormer_Hyper-CUB-FixedClstrSep-Ent01-linear-5e5LR"  # ****** BEST RESULT  75.99% ***** more epochs didn't help
+run_name="ProtoPFormer_Hyper-CUB-FixedClstrSep-Ent01-linear-5e5LR-StepLR_08"   # TODO CHECK IF NAN or sta
+#run_name="ProtoPFormer_Hyper-CUB-FixedClstrSep-Ent01-linear-5e5LR-noSigmoid"  # NAN
+####### Tanh
+#run_name="ProtoPFormer_Hyper-CUB-FixedClstrSep-Ent01-linear-5e5LR-tanh_randn"  # Result: 74.3% but can go higher!
+run_name="ProtoPFormer_Hyper-CUB-FixedClstrSep-Ent02-linear-5e5LR-tanh_randn"  # TODO CHECK IF NAN or stable?
+######## lower minLR to cooldown more?
+run_name="ProtoPFormer_Hyper-CUB-FixedClstrSep-Ent02-linear-5e5LR-tanh_randn-min_LR_1e7"  # TODO CHECK IF NAN or stable?
+######## Step Learning rate scheduler
+run_name="ProtoPFormer_Hyper-CUB-FixedClstrSep-Ent02-linear-5e5LR-tanh_randn-StepLR_08"  # TODO CHECK IF NAN or stable?
+
+#run_name="ProtoPFormer_Hyper-CUB-FixedClstrSep-Ent01-linear-5e5LR-300e"  # 75.56%
+#run_name="ProtoPFormer_Hyper-CUB-FixedClstrSep-Ent01-linear-5e5LR-300e-warmup"  # 75.47%
+##run_name="ProtoPFormer_Hyper-CUB-FixedClstrSep-Ent01-linear-5e5LR-B256"   # meh, not so good! 70%
+##run_name="ProtoPFormer_Hyper-CUB-FixedClstrSep-Ent001-linear-5e5LR"   # ****** REALLY GOOD RESULT   75.88% ****** more epochs didn't help
+#run_name="ProtoPFormer_Hyper-CUB-FixedClstrSep-Ent001-linear-5e5LR-300e"  # 75.89%
+#run_name="ProtoPFormer_Hyper-CUB-FixedClstrSep-Ent001-linear-5e5LR-300e-warmup"  #  75.87%
+##run_name="ProtoPFormer_Hyper-CUB-FixedClstrSep-Ent001-linear-5e5LR-B256"   # COLLAPSED
+
+####################################################################################################
+#######################################  ent 0 ########################################
+####################################################################################################
+#entailment_coe=0  # entailment loss coefficient
+########################################  # results were meh! warmup was worse! maybe it's  not enough LR
+#run_name="ProtoPFormer_Hyper-CUB-FixedClstrSep-Ent0"
+#run_name="ProtoPFormer_Hyper-CUB-FixedClstrSep-Ent0-warmup"
+#
+########################################  log vs linear
+#run_name="ProtoPFormer_Hyper-CUB-FixedClstrSep-Ent0-linear"  # OK. 74.8%
+#run_name="ProtoPFormer_Hyper-CUB-FixedClstrSep-Ent0-linear-5e5LR"  # RESULT: much better than above  75.7%
+#
+########################################  log, but with larger LR
+##run_name="ProtoPFormer_Hyper-CUB-FixedClstrSep-Ent0-3e3LR"  # Collapsed again! so maybe collapse = large LR
+#
+########################################  add_on_layers, 2 vs 1 Conv2D
+#
+########################################  larger batch size!
 
 # model=deit_tiny_patch16_224
 # model=deit_small_patch16_224
 # model=cait_xxs24_224
 # batch_size=128
 # num_gpus=4
-model=$1
-batch_size=$2
-num_gpus=$3
+
+#model=$1
+#batch_size=$2
+#num_gpus=$3
+
+model=deit_tiny_patch16_224
+batch_size=64
+num_gpus=1
 
 wandb_mode="online" # one of "online", "offline" or "disabled"
-run_name="ProtoPFormer_Hyper-CUB-0"
 
 use_port=$((2672 + $CUDA_VISIBLE_DEVICES))
 seed=1028
 
 # Learning Rate
 warmup_lr=1e-4
-warmup_epochs=0
+warmup_epochs=0  # TODO TRY 5
 min_lr=1e-6
 features_lr=1e-4
 add_on_layers_lr=3e-3
 prototype_vectors_lr=3e-3
-last_layer_lr=1e-4
-last_layer_global_lr=1e-4
-curv_lr=5e-4
-visual_alpha_lr=5e-4
+last_layer_lr=5e-5
+last_layer_global_lr=5e-5
+curv_lr=5e-5
+visual_alpha_lr=5e-5
 
 # Optimizer & Scheduler
 opt=adamw
 sched=cosine
+#sched=step
 decay_epochs=10
 decay_rate=0.9
+#decay_rate=0.8
 weight_decay=0.05
 epochs=200
 output_dir=output_cosine/
 input_size=224
 
-prototype_activation_function="log"
-entailment_coe=0  # entailment loss coefficient
+entailment_coe=0.2  # entailment loss coefficient
+prototype_activation_function="linear"
 feat_range_type="Sigmoid"   # can be "Tanh" or "Sigmoid"
 use_global=True
-use_ppc_loss=True   # Whether use PPC loss
+use_ppc_loss=False   # Whether use PPC loss
 last_reserve_num=81 # Number of reserve tokens in the last layer
 global_coe=0.5      # Weight of the global branch, 1 - global_coe is for local branch
 ppc_cov_thresh=1.   # The covariance thresh of PPC loss
