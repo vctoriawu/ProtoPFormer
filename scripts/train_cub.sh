@@ -16,7 +16,7 @@ num_gpus=$3
 wandb_mode="online" # one of "online", "offline" or "disabled"
 run_name="ProtoPFormer_Hyper-CUB-0"
 
-use_port=2672
+use_port=$((2672 + $CUDA_VISIBLE_DEVICES))
 seed=1028
 
 # Learning Rate
