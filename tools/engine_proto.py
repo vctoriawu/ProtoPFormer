@@ -78,7 +78,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: _Loss,
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
     header = 'Epoch: [{}]'.format(epoch)
     print_freq = 30
-    num_classes = 200
+    num_classes = args.nb_classes
 
     logger = logging.getLogger("train")
     logger.info("Start train one epoch")

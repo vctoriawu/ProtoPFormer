@@ -36,6 +36,7 @@ import wandb
 def get_args_parser():
     parser = argparse.ArgumentParser('Vision Transformer KD training and evaluation script',
                         add_help=False)
+    parser.add_argument('--run_name', type=str, default='ProtoPFormer_Hyper-Train')
     parser.add_argument('--wandb_mode', type=str, default='online')
     parser.add_argument('--batch_size', default=256, type=int)
     # parser.add_argument('--distill', type=bool, default=False)
@@ -53,11 +54,13 @@ def get_args_parser():
     parser.add_argument('--baseline_path', type=str, default=None)
     parser.add_argument('--reserve_layers', nargs='+', type=int, default=[])
     parser.add_argument('--reserve_token_nums', nargs='+', type=int, default=[])
+    parser.add_argument('--feat_range_type', type=str, default="Sigmoid")
     parser.add_argument('--use_global', type=str2bool, default=False)
     parser.add_argument('--use_ppc_loss', type=str2bool, default=False)
     parser.add_argument('--ppc_cov_thresh', type=float, default=1.)
     parser.add_argument('--ppc_mean_thresh', type=float, default=2.)
     parser.add_argument('--global_coe', type=float, default=0.5)
+    parser.add_argument('--entailment_coe', type=float, default=0.2)
     parser.add_argument('--global_proto_per_class', type=int, default=1)
     parser.add_argument('--ppc_cov_coe', type=float, default=0.1)
     parser.add_argument('--ppc_mean_coe', type=float, default=0.5)
@@ -67,6 +70,10 @@ def get_args_parser():
     parser.add_argument('--features_lr', type=float, default=1e-4)
     parser.add_argument('--add_on_layers_lr', type=float, default=3e-3)
     parser.add_argument('--prototype_vectors_lr', type=float, default=3e-3)
+    parser.add_argument('--last_layer_lr', type=float, default=1e-4)
+    parser.add_argument('--last_layer_global_lr', type=float, default=1e-4)
+    parser.add_argument('--curv_lr', type=float, default=5e-4)
+    parser.add_argument('--visual_alpha_lr', type=float, default=5e-4)
     parser.add_argument('--joint_lr_step_size', type=int, default=5)
 
     parser.add_argument('--coefs_crs_ent', type=float, default=1)
@@ -118,7 +125,7 @@ def get_args_parser():
                         help='learning rate noise std-dev (default: 1.0)')
     parser.add_argument('--warmup-lr', type=float, default=1e-6, metavar='LR',
                         help='warmup learning rate (default: 1e-5)')
-    parser.add_argument('--min-lr', type=float, default=1e-6, metavar='LR',
+    parser.add_argument('--min_lr', type=float, default=1e-6, metavar='LR',
                         help='lower lr bound for cyclic schedulers that hit 0 (1e-5)')
 
     parser.add_argument('--decay-epochs', type=float, default=30, metavar='N',
@@ -194,7 +201,7 @@ def get_args_parser():
                         help='start epoch')
     parser.add_argument('--eval', action='store_true', help='Perform evaluation only')
     parser.add_argument('--dist-eval', action='store_true', default=False, help='Enabling distributed evaluation')
-    parser.add_argument('--num_workers', default=10, type=int)
+    parser.add_argument('--num_workers', default=8, type=int)
     parser.add_argument('--pin-mem', action='store_true',
                         help='Pin CPU memory in DataLoader for more efficient (sometimes) transfer to GPU.')
     parser.add_argument('--no-pin-mem', action='store_false', dest='pin_mem',
@@ -256,9 +263,9 @@ def main(args):
 
     wandb.init(
         project="Hyperbolic_Hierarchical_ProtoNet",  # Name of your project on wandb
-        name="ProtoPFormer_Hyper_No_Crop",          # Name of the specific run/experiment
         config=args,
         mode=args.wandb_mode,  # one of "online", "offline" or "disabled"
+        name=None if args.run_name == "" else args.run_name,           # Name of the specific run/experiment
         entity="rcl_stroke"
     )
     # define a metric we are interested in the maximum of
@@ -362,6 +369,7 @@ def main(args):
                                 num_classes=args.nb_classes,
                                 reserve_layers=args.reserve_layers,
                                 reserve_token_nums=args.reserve_token_nums,
+                                feat_range_type=args.feat_range_type,  # can be "Tanh" or "Sigmoid"
                                 use_global=args.use_global,
                                 use_ppc_loss=args.use_ppc_loss,
                                 ppc_cov_thresh=args.ppc_cov_thresh,
@@ -382,9 +390,15 @@ def main(args):
             device='cpu' if args.model_ema_force_cpu else '',
             resume='')
 
-    joint_optimizer_lrs = {'features': args.features_lr,
-                        'add_on_layers': args.add_on_layers_lr,
-                        'prototype_vectors': args.prototype_vectors_lr,}
+    joint_optimizer_lrs = {
+        'features': args.features_lr,
+        'add_on_layers': args.add_on_layers_lr,
+        'prototype_vectors': args.prototype_vectors_lr,
+        'last_layer': args.last_layer_lr,
+        'last_layer_global': args.last_layer_global_lr,
+        'curv': args.curv_lr,
+        'visual_alpha': args.visual_alpha_lr,
+    }
 
     model_without_ddp = model
     if args.distributed:
@@ -401,7 +415,7 @@ def main(args):
     lr_scheduler, _ = create_scheduler(args, optimizer)
 
     criterion = LabelSmoothingCrossEntropy()
-    entailment_loss = Entailment(num_classes=args.nb_classes, loss_weight=0.2)
+    entailment_loss = Entailment(num_classes=args.nb_classes, loss_weight=args.entailment_coe)
 
     if args.mixup > 0.:
         # smoothing is handled with mixup label transform

@@ -98,9 +98,33 @@ def build_dataset_view(is_train, args):
         dataset = Cub2011(args.data_path, train=is_train, transform=transform)
         nb_classes = 200
     elif args.data_set == 'Dogs':
-        dataset = Dogs(root=os.path.join(args.data_path, 'stanford_dogs'), train=is_train, cropped=False,
-                    transform=transform, download=False)
-        nb_classes = 120
+        normalize = transforms.Normalize(IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD)
+        img_size = 224
+        data_path = '/workspace/Hyperbolic_Hierarchical_Protonet_dev/data/PETS/'
+        if is_train:
+            dataset = datasets.OxfordIIITPet(root=data_path, split='trainval',
+                                                   transform=transforms.Compose([
+                                                       transforms.RandomAffine(degrees=(-25, 25), shear=15),
+                                                       transforms.RandomHorizontalFlip(),
+                                                       transforms.Resize(size=(img_size, img_size)),
+                                                       transforms.ToTensor(),
+                                                       normalize,
+                                                   ]),
+                                                   target_types="category", download=True)
+        else:
+            dataset = datasets.OxfordIIITPet(root=data_path, split='test',
+                                                 transform=transforms.Compose([
+                                                     transforms.Resize(size=(img_size, img_size)),
+                                                     transforms.ToTensor(),
+                                                     normalize,
+                                                 ]),
+                                                 target_types="category", download=True)
+        args.nb_classes = 37
+        nb_classes = 37
+
+        # dataset = Dogs(root=os.path.join(args.data_path, 'stanford_dogs'), train=is_train, cropped=False,
+        #             transform=transform, download=False)
+        # nb_classes = 120
     elif args.data_set == 'CUB2011':
         if is_train:
             dataset = datasets.ImageFolder(
@@ -143,9 +167,33 @@ def build_dataset_noaug(is_train, args):
         dataset = Cub2011(args.data_path, train=is_train, transform=transform)
         nb_classes = 200
     elif args.data_set == 'Dogs':
-        dataset = Dogs(root=os.path.join(args.data_path, 'stanford_dogs'), train=is_train, cropped=False,
-                    transform=transform, download=False)
-        nb_classes = 120
+        normalize = transforms.Normalize(IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD)
+        img_size = 224
+        data_path = '/workspace/Hyperbolic_Hierarchical_Protonet_dev/data/PETS/'
+        if is_train:
+            dataset = datasets.OxfordIIITPet(root=data_path, split='trainval',
+                                                   transform=transforms.Compose([
+                                                       transforms.RandomAffine(degrees=(-25, 25), shear=15),
+                                                       transforms.RandomHorizontalFlip(),
+                                                       transforms.Resize(size=(img_size, img_size)),
+                                                       transforms.ToTensor(),
+                                                       normalize,
+                                                   ]),
+                                                   target_types="category", download=True)
+        else:
+            dataset = datasets.OxfordIIITPet(root=data_path, split='test',
+                                                 transform=transforms.Compose([
+                                                     transforms.Resize(size=(img_size, img_size)),
+                                                     transforms.ToTensor(),
+                                                     normalize,
+                                                 ]),
+                                                 target_types="category", download=True)
+        args.nb_classes = 37
+        nb_classes = 37
+
+        # dataset = Dogs(root=os.path.join(args.data_path, 'stanford_dogs'), train=is_train, cropped=False,
+        #             transform=transform, download=False)
+        # nb_classes = 120
     elif args.data_set == 'CUB2011':
         if is_train:
             dataset = datasets.ImageFolder(
@@ -191,9 +239,33 @@ def build_dataset(is_train, args):
     #                    transform=transform, download=True)
     #     nb_classes = 196
     elif args.data_set == 'Dogs':
-        dataset = Dogs(root=os.path.join(args.data_path, 'stanford_dogs'), train=is_train, cropped=False,
-                    transform=transform, download=False)
-        nb_classes = 120
+        normalize = transforms.Normalize(IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD)
+        img_size = 224
+        data_path = '/workspace/Hyperbolic_Hierarchical_Protonet_dev/data/PETS/'
+        if is_train:
+            dataset = datasets.OxfordIIITPet(root=data_path, split='trainval',
+                                             transform=transforms.Compose([
+                                                 transforms.RandomAffine(degrees=(-25, 25), shear=15),
+                                                 transforms.RandomHorizontalFlip(),
+                                                 transforms.Resize(size=(img_size, img_size)),
+                                                 transforms.ToTensor(),
+                                                 normalize,
+                                             ]),
+                                             target_types="category", download=True)
+        else:
+            dataset = datasets.OxfordIIITPet(root=data_path, split='test',
+                                             transform=transforms.Compose([
+                                                 transforms.Resize(size=(img_size, img_size)),
+                                                 transforms.ToTensor(),
+                                                 normalize,
+                                             ]),
+                                             target_types="category", download=True)
+        args.nb_classes = 37
+        nb_classes = 37
+
+        # dataset = Dogs(root=os.path.join(args.data_path, 'stanford_dogs'), train=is_train, cropped=False,
+        #             transform=transform, download=False)
+        # nb_classes = 120
     elif args.data_set == 'Caltech256':
         dataset = datasets.Caltech256(args.data_path, transform=transform)
         nb_classes = 256
