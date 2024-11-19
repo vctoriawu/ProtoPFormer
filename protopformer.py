@@ -153,6 +153,7 @@ class PPNet(nn.Module):
         self.all_attn_mask = None
         self.teacher_model = None
 
+        # TODO what is this scale? how can we use it?
         self.scale = self.prototype_shape[1] ** -0.5
 
         if init_weights:
@@ -305,17 +306,19 @@ class PPNet(nn.Module):
         total_proto_act = activations
         fea_size = activations.shape[-1]
         if fea_size > 1:
-            distances = -F.max_pool2d(-distances, kernel_size=(distances.size()[2], distances.size()[3]))
+            min_distances = -F.max_pool2d(-distances, kernel_size=(distances.size()[2], distances.size()[3]))
             activations = F.max_pool2d(activations, kernel_size=(fea_size, fea_size))   # (B, 2000, 1, 1)
+        else:
+            min_distances = distances
         activations = activations.reshape(batch_size, num_prototypes)
-        distances = distances.reshape(batch_size, num_prototypes)
+        min_distances = min_distances.reshape(batch_size, num_prototypes)
         # if act_type == "local":
         #     activations = activations.reshape(batch_size, num_prototypes)
         # elif act_type == "global":
         #     activations = activations.reshape(batch_size, num_prototypes)#self.num_classes)
         if self.use_global:
             #print(activations)
-            return activations, (distances, total_proto_act)
+            return activations, (min_distances, distances, total_proto_act)
         return activations
 
     def batch_cov(self, points, weights):
@@ -364,8 +367,8 @@ class PPNet(nn.Module):
         if not self.training:
             if self.use_global:
                 (cls_tokens, img_tokens), (token_attn, cls_token_attn, _), global_feat_prot_lorentz_distance, part_feat_prot_lorentz_distance = self.prototype_distances(x, reserve_layer_nums)
-                global_activations, (min_distances_global, _)  = self.get_activations(cls_tokens, self.prototype_vectors_global, global_feat_prot_lorentz_distance, 'global')
-                local_activations, (min_distances_local, total_proto_act) = self.get_activations(img_tokens, self.prototype_vectors, part_feat_prot_lorentz_distance, 'local')
+                global_activations, (min_distances_global, _, _) = self.get_activations(cls_tokens, self.prototype_vectors_global, global_feat_prot_lorentz_distance, 'global')
+                local_activations, (min_distances_local, distances_local, total_proto_act) = self.get_activations(img_tokens, self.prototype_vectors, part_feat_prot_lorentz_distance, 'local')
 
                 # prototype_activations = torch.cat([local_activations, global_activations], dim=-1)
                 # logits = self.last_layer(prototype_activations)  # shape (N, num_classes)
@@ -373,7 +376,7 @@ class PPNet(nn.Module):
                 logits_global = self.last_layer_global(global_activations)
                 logits_local = self.last_layer(local_activations)
                 logits = self.global_coe * logits_global + (1. - self.global_coe) * logits_local
-                return logits, (cls_token_attn, min_distances_local, logits_global, logits_local)
+                return logits, (cls_token_attn, distances_local, logits_global, logits_local)
 
         # re-calculate distances
         if self.use_global:
@@ -383,8 +386,8 @@ class PPNet(nn.Module):
             batch_size, fea_size, original_fea_size = cls_tokens.shape[0], img_tokens.shape[-1], int(cls_attn_rollout.shape[-1] ** (1/2))
             teacher_token_attn = cls_attn_rollout
 
-            global_activations, (min_distances_global, _) = self.get_activations(cls_tokens, self.prototype_vectors_global, global_feat_prot_lorentz_distance, 'global')
-            local_activations, (min_distances_local, total_proto_act) = self.get_activations(img_tokens, self.prototype_vectors, part_feat_prot_lorentz_distance, 'local')
+            global_activations, (min_distances_global, _, _) = self.get_activations(cls_tokens, self.prototype_vectors_global, global_feat_prot_lorentz_distance, 'global')
+            local_activations, (min_distances_local, _, total_proto_act) = self.get_activations(img_tokens, self.prototype_vectors, part_feat_prot_lorentz_distance, 'local')
 
             # prototype_activations = torch.cat([local_activations, global_activations], dim=-1)
             # logits = self.last_layer(prototype_activations)  # shape (N, num_classes)
@@ -416,8 +419,8 @@ class PPNet(nn.Module):
         '''this method is needed for the pushing operation'''
         reserve_layer_nums = self.reserve_layer_nums
         (cls_tokens, img_tokens), (token_attn, cls_token_attn, _), global_feat_prot_lorentz_distance, part_feat_prot_lorentz_distance = self.prototype_distances(x, reserve_layer_nums)
-        global_activations, _ = self.get_activations(cls_tokens, self.prototype_vectors_global, global_feat_prot_lorentz_distance)
-        local_activations, (distances, proto_acts) = self.get_activations(img_tokens, self.prototype_vectors, part_feat_prot_lorentz_distance)
+        global_activations, _, _ = self.get_activations(cls_tokens, self.prototype_vectors_global, global_feat_prot_lorentz_distance)
+        local_activations, (_, _, proto_acts) = self.get_activations(img_tokens, self.prototype_vectors, part_feat_prot_lorentz_distance)
 
         return cls_token_attn, proto_acts
 

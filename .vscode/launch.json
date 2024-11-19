@@ -57,6 +57,39 @@
                 "--ppc_cov_coe", "0.1",
                 "--ppc_mean_coe", "0.5"
             ],
+        },
+        {
+            "name": "ProtoPFormer_Vis_Debug",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${cwd}/main_visualize.py",
+            "console": "integratedTerminal",
+            "cwd": "${cwd}",
+            "justMyCode": true,
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "1",
+            },
+            "args": [
+                "--prototype_activation_function", "linear",
+                "--finetune", "visualize",
+                "--modeldir", "output_cosine/Dogs/deit_small_patch16_224/ProtoPFormer_Hyper-PETS-0/1028--adamw-0.05-200-protopformer/checkpoints",
+                "--model", "epoch-best.pth",
+                "--data_path", "/workspace/Hyperbolic_Hierarchical_Protonet_dev/data",
+                "--data_set", "Dogs",
+                "--prototype_shape", "370", "192", "1", "1",
+                "--reserve_layers", "11",
+                "--reserve_token_nums", "81",
+                "--use_global", "True",
+                "--use_ppc_loss", "False",
+                "--global_coe", "0.5",
+                "--global_proto_per_class", "10",
+                "--base_architecture", "deit_small_patch16_224",
+                "--batch_size", "20",
+                "--visual_type", "slim_gaussian",
+                "--output_dir", "output_view/",
+                "--use_gauss", "False",
+                "--vis_classes", "6", "8", "10", "12", "14"
+            ],
         }
     ]
 }
