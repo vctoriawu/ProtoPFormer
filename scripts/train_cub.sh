@@ -87,7 +87,7 @@ run_name="ProtoPFormer_Hyper-CUB-FixedClstrSep-Ent02-linear-5e5LR-tanh_randn-Ste
 #batch_size=$2
 #num_gpus=$3
 
-model=deit_tiny_patch16_224
+model=deit_small_patch16_224
 batch_size=64
 num_gpus=1
 
@@ -102,7 +102,7 @@ warmup_epochs=0  # TODO TRY 5
 min_lr=1e-6
 features_lr=1e-4
 add_on_layers_lr=3e-3
-prototype_vectors_lr=3e-3
+prototype_vectors_lr=5e-4
 last_layer_lr=5e-5
 last_layer_global_lr=5e-5
 curv_lr=5e-5
@@ -116,7 +116,7 @@ decay_epochs=10
 decay_rate=0.9
 #decay_rate=0.8
 weight_decay=0.05
-epochs=200
+epochs=400
 output_dir=output_cosine/
 input_size=224
 
@@ -124,7 +124,7 @@ entailment_coe=0.2  # entailment loss coefficient
 prototype_activation_function="linear"
 feat_range_type="Sigmoid"   # can be "Tanh" or "Sigmoid"
 use_global=True
-use_ppc_loss=False   # Whether use PPC loss
+use_ppc_loss=False   # Whether use PPC loss  # TODO TRY TRUE?
 last_reserve_num=81 # Number of reserve tokens in the last layer
 global_coe=0.5      # Weight of the global branch, 1 - global_coe is for local branch
 ppc_cov_thresh=1.   # The covariance thresh of PPC loss

@@ -2,21 +2,37 @@
 
 export PYTHONPATH=./:$PYTHONPATH
 # export CUDA_VISIBLE_DEVICES=0,1,2,3
-export CUDA_VISIBLE_DEVICES=4,5,6,7
+#export CUDA_VISIBLE_DEVICES=4,5,6,7
 
 # model=deit_tiny_patch16_224
 # model=deit_small_patch16_224
 # model=cait_xxs24_224
 # batch_size=128
 # num_gpus=4
-model=$1
-batch_size=$2
-num_gpus=$3
+model=deit_small_patch16_224
+batch_size=64
+num_gpus=1
 
 wandb_mode="online" # one of "online", "offline" or "disabled"
-run_name="ProtoPFormer_Hyper-DOGS-0"
 
-use_port=2675
+###################################################################
+prototype_activation_function="log"
+last_layer_lr=0
+last_layer_global_lr=0
+curv_lr=0
+visual_alpha_lr=0
+run_name="ProtoPFormer_Hyper-PETS-VicConfig-0"
+
+###################################################################
+prototype_activation_function="linear"
+last_layer_lr=1e-4
+last_layer_global_lr=1e-4
+curv_lr=5e-4
+visual_alpha_lr=5e-4
+run_name="ProtoPFormer_Hyper-PETS-0"
+###################################################################
+
+use_port=$((2675 + $CUDA_VISIBLE_DEVICES))
 seed=1028
 
 # Learning Rate
@@ -24,12 +40,12 @@ warmup_lr=1e-4
 min_lr=1e-6
 warmup_epochs=5
 features_lr=5e-5
-add_on_layers_lr=3e-3
-prototype_vectors_lr=3e-3
-last_layer_lr=1e-4
-last_layer_global_lr=1e-4
-curv_lr=5e-4
-visual_alpha_lr=5e-4
+add_on_layers_lr=1e-4
+prototype_vectors_lr=1e-4
+#last_layer_lr=1e-4
+#last_layer_global_lr=1e-4
+#curv_lr=5e-4
+#visual_alpha_lr=5e-4
 
 # Optimizer & Scheduler
 opt=adamw
@@ -41,16 +57,15 @@ epochs=200
 output_dir=output_cosine/
 input_size=224
 
-prototype_activation_function="log"
-entailment_coe=0.2  # entailment loss coefficient
+entailment_coe=0.2  # entailment loss coefficient  # TODO either 0 or 0.2
 feat_range_type="Sigmoid"   # can be "Tanh" or "Sigmoid"
 use_global=True
-use_ppc_loss=True   # Whether use PPC loss
+use_ppc_loss=False   # Whether use PPC loss
 last_reserve_num=81 # Number of reserve tokens in the last layer
 global_coe=0.5      # Weight of the global branch, 1 - global_coe is for local branch
 ppc_cov_thresh=1.   # The covariance thresh of PPC loss
 ppc_mean_thresh=2.  # The mean thresh of PPC loss
-global_proto_per_class=5    # Number of global prototypes per class
+global_proto_per_class=10    # Number of global prototypes per class
 ppc_cov_coe=0.1     # The weight of the PPC_{sigma} Loss
 ppc_mean_coe=0.5    # The weight of the PPC_{mu} Loss
 dim=192             # The dimension of each prototype
@@ -70,7 +85,7 @@ ft=protopformer
 
 for data_set in Dogs;
 do
-    prototype_num=1200
+    prototype_num=370
     data_path=datasets
     python -m torch.distributed.launch --nproc_per_node=$num_gpus --master_port=$use_port --use_env main.py \
         --wandb_mode=$wandb_mode \
