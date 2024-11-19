@@ -1,13 +1,25 @@
-model=$1
-data_set=$2
-output_dir=$3
-use_gauss=$4
-modeldir=$5
-modelfile=$6
+export CUDA_VISIBLE_DEVICES=$1
+
+#model=$1
+#data_set=$2
+#output_dir=$3
+#use_gauss=$4
+#modeldir=$5
+#modelfile=$6
+
+model=deit_small_patch16_224
+data_set=Dogs
+output_dir="output_view/"
+use_gauss=False
+modeldir="output_cosine/Dogs/deit_small_patch16_224/ProtoPFormer_Hyper-PETS-0/1028--adamw-0.05-200-protopformer/checkpoints"
+modelfile="epoch-best.pth"
+
+prototype_activation_function="linear"
 
 data_path=datasets
+#data_path=/workspace/Hyperbolic_Hierarchical_Protonet_dev/data
 dim=192
-batch_size=60
+batch_size=20
 
 if [ "$model" = "deit_small_patch16_224" ]
 then
@@ -32,12 +44,13 @@ then
     reserve_token_nums=121
 elif [ "$data_set" = "Dogs" ]
 then
-    global_proto_per_class=5
-    prototype_num=1200
+    global_proto_per_class=10
+    prototype_num=370
     reserve_token_nums=81
 fi
 
 python main_visualize.py \
+    --prototype_activation_function=$prototype_activation_function \
     --finetune=visualize \
     --modeldir=$modeldir \
     --model=$modelfile \

@@ -166,7 +166,7 @@ def get_args():
     parser.add_argument('--use_gauss', type=str2bool, default=False)
     parser.add_argument('--vis_classes', nargs='+', type=int, default=[6, 7, 8])
 
-    parser.add_argument('--prototype_activation_function', type=str, default='log')
+    parser.add_argument('--prototype_activation_function', type=str, default='linear')
     parser.add_argument('--add_on_layers_type', type=str, default='regular')
     #parser.add_argument('-dataset', nargs=1, type=str, default='cub200')
     # Augmentation parameters
@@ -357,7 +357,10 @@ for category_id in args.vis_classes:
             break
     all_token_attn = np.concatenate(all_token_attn, axis=0)
     distances = np.concatenate(min_distances, axis=0)
-    proto_acts = np.log((distances + 1) / (distances + ppnet.epsilon))
+    if ppnet.prototype_activation_function == 'log':
+        proto_acts = np.log((distances + 1) / (distances + ppnet.epsilon)) # (B, 2000, H, W)
+    elif ppnet.prototype_activation_function == 'linear':
+        proto_acts = -distances # (B, 2000, H, W)
     total_proto_acts = proto_acts
 
     proto_acts = np.amax(proto_acts, (2, 3))

@@ -1,9 +1,11 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import math
 
 from tools.deit_features import deit_tiny_patch_features, deit_small_patch_features
 from tools.cait_features import cait_xxs24_224_features
+import tools.lorentz as L
 
 base_architecture_to_features = {'deit_tiny_patch16_224': deit_tiny_patch_features,
                                  'deit_small_patch16_224': deit_small_patch_features,
@@ -15,12 +17,13 @@ class PPNet(nn.Module):
                  proto_layer_rf_info, num_classes,
                  reserve_layers=[],
                  reserve_token_nums=[],
+                 feat_range_type="Sigmoid",  # can be "Tanh" or "Sigmoid"
                  use_global=False,
                  use_ppc_loss=False,
                  ppc_cov_thresh=2.,
                  ppc_mean_thresh=2,
                  global_coe=0.3,
-                 global_proto_per_class=10,
+                 global_proto_per_class=1,
                  init_weights=True,
                  prototype_activation_function='log',
                  add_on_layers_type='bottleneck'):
@@ -32,6 +35,7 @@ class PPNet(nn.Module):
         self.num_classes = num_classes
         self.reserve_layers = reserve_layers
         self.reserve_token_nums = reserve_token_nums
+        self.feat_range_type = feat_range_type
         self.use_global = use_global
         self.use_ppc_loss = use_ppc_loss
         self.ppc_cov_thresh = ppc_cov_thresh
@@ -109,13 +113,24 @@ class PPNet(nn.Module):
         else:
             self.add_on_layers = nn.Sequential(
                 nn.Conv2d(in_channels=first_add_on_layer_in_channels, out_channels=self.prototype_shape[1], kernel_size=1),
-                nn.Sigmoid()
-                )
+                # nn.ReLU(),
+                # nn.Conv2d(in_channels=self.prototype_shape[1], out_channels=self.prototype_shape[1], kernel_size=1),
+                # # TODO REMOVE SIGMOID?  Did that, it causes NAN! so we keep it
+                nn.__dict__[feat_range_type](),  # can be Sigmoid or Tanh
+            )
 
-        self.prototype_vectors = nn.Parameter(torch.rand(self.prototype_shape),
+
+        if feat_range_type == "Tanh":
+            random_init = "randn"
+        elif feat_range_type == "Sigmoid":
+            random_init = "rand"
+        else:
+            raise (ValueError(f"feat_range_type {self.feat_range_type} is not supported"))
+
+        self.prototype_vectors = nn.Parameter(torch.__dict__[random_init](self.prototype_shape),
                                               requires_grad=True)
         if self.use_global:
-            self.prototype_vectors_global = nn.Parameter(torch.rand(self.prototype_shape_global),
+            self.prototype_vectors_global = nn.Parameter(torch.__dict__[random_init](self.prototype_shape_global),
                                               requires_grad=True)
 
         # do not make this just a tensor,
@@ -123,20 +138,46 @@ class PPNet(nn.Module):
         self.ones = nn.Parameter(torch.ones(self.prototype_shape),
                                  requires_grad=False)
 
+        # '''
         self.last_layer = nn.Linear(self.num_prototypes, self.num_classes,
                                     bias=False) # do not use bias
         self.last_layer_global = nn.Linear(self.num_prototypes_global, self.num_classes,
                                     bias=False) # do not use bias
-        self.last_layer.weight.requires_grad = False
-        self.last_layer_global.weight.requires_grad = False
+        self.last_layer.weight.requires_grad = True # why was this false
+        self.last_layer_global.weight.requires_grad = True
+        # '''
+        # self.last_layer = nn.Linear(self.num_prototypes+self.num_prototypes_global, self.num_classes,
+        #                             bias=False) # do not use bias
+        # self.last_layer.weight.requires_grad = True # why was this false
 
         self.all_attn_mask = None
         self.teacher_model = None
 
+        # TODO what is this scale? how can we use it?
         self.scale = self.prototype_shape[1] ** -0.5
 
         if init_weights:
             self._initialize_weights()
+
+        # Initialize curvature parameter. Hyperboloid curvature will be `-curv`.
+        curv_init = 1.0
+        learn_curv = True
+        self.curv = nn.Parameter(
+            torch.tensor(curv_init).log(), requires_grad=learn_curv
+        )
+        # When learning the curvature parameter, restrict it in this interval to
+        # prevent training instability.
+        self._curv_minmax = {
+            "max": math.log(curv_init * 10),
+            "min": math.log(curv_init / 10),
+        }
+
+        # Learnable scalars to ensure that image features have an expected
+        # unit norm before exponential map (at initialization).
+        self.visual_alpha = nn.Parameter(torch.tensor(self.prototype_shape[1] ** -0.5).log())
+
+        self.batch_norm = nn.BatchNorm1d(self.num_prototypes)
+        self.batch_norm_global = nn.BatchNorm1d(self.num_prototypes_global)
 
     def conv_features(self, x, reserve_layer_nums=[]):
         '''
@@ -167,7 +208,7 @@ class PPNet(nn.Module):
             img_tokens = img_tokens.permute(0, 2, 1).reshape(B, dim, fea_height, fea_width) # (batch_size, dim, fea_size, fea_size)
         else:
             x = self.features(x)
-        
+
         cls_tokens = self.add_on_layers(cls_tokens)
         img_tokens = self.add_on_layers(img_tokens)
         return (cls_tokens, img_tokens), (token_attn, cls_token_attn, None)
@@ -223,7 +264,29 @@ class PPNet(nn.Module):
         '''
         if self.use_global:
             (cls_tokens, img_tokens), auxi_item = self.conv_features(x, reserve_layer_nums)
-            return (cls_tokens, img_tokens), auxi_item
+
+            #### We want to return the distances in the Lorentz space now #####
+            ###############################################################
+            ##### MERU-based operations for hyperbolic space analysis #####
+            self.curv.data = torch.clamp(self.curv.data, **self._curv_minmax)
+            _curv = self.curv.exp()
+            # Clamp scaling factors such that they do not up-scale the feature norms.
+            # Once `exp(scale) = 1`, they can simply be removed during inference.
+            self.visual_alpha.data = torch.clamp(self.visual_alpha.data, max=0.0)
+
+            hyperbolic_feature_map = L.get_hyperbolic_feats(img_tokens.permute(0, 2, 3, 1),
+                                                        self.visual_alpha, self.curv, self.device)
+            part_feat_prot_lorentz_distance = L.pairwise_dist(hyperbolic_feature_map,
+                                                          self.prototype_vectors.squeeze(),
+                                                          _curv)
+
+            hyperbolic_feature_map_global = L.get_hyperbolic_feats(cls_tokens.permute(0, 2, 3, 1),
+                                                        self.visual_alpha, self.curv, self.device)
+            global_feat_prot_lorentz_distance = L.pairwise_dist(hyperbolic_feature_map_global,
+                                                          self.prototype_vectors_global.squeeze(),
+                                                          _curv)
+
+            return (cls_tokens, img_tokens), auxi_item, global_feat_prot_lorentz_distance, part_feat_prot_lorentz_distance
 
     def distance_2_similarity(self, distances):
         if self.prototype_activation_function == 'log':
@@ -233,17 +296,29 @@ class PPNet(nn.Module):
         else:
             return self.prototype_activation_function(distances)
 
-    def get_activations(self, tokens, prototype_vectors):
+    def get_activations(self, tokens, prototype_vectors, distances, act_type):
         batch_size, num_prototypes = tokens.shape[0], prototype_vectors.shape[0]
-        distances = self._l2_convolution_single(tokens, prototype_vectors)
+        #distances = self._l2_convolution_single(tokens, prototype_vectors)
+        distances = distances.permute(0, 3, 1, 2)
         activations = self.distance_2_similarity(distances)   # (B, 2000, 1, 1)
+
+        # TODO: Fix the shape of the activations
         total_proto_act = activations
         fea_size = activations.shape[-1]
         if fea_size > 1:
+            min_distances = -F.max_pool2d(-distances, kernel_size=(distances.size()[2], distances.size()[3]))
             activations = F.max_pool2d(activations, kernel_size=(fea_size, fea_size))   # (B, 2000, 1, 1)
+        else:
+            min_distances = distances
         activations = activations.reshape(batch_size, num_prototypes)
+        min_distances = min_distances.reshape(batch_size, num_prototypes)
+        # if act_type == "local":
+        #     activations = activations.reshape(batch_size, num_prototypes)
+        # elif act_type == "global":
+        #     activations = activations.reshape(batch_size, num_prototypes)#self.num_classes)
         if self.use_global:
-            return activations, (distances, total_proto_act)
+            #print(activations)
+            return activations, (min_distances, distances, total_proto_act)
         return activations
 
     def batch_cov(self, points, weights):
@@ -291,31 +366,37 @@ class PPNet(nn.Module):
         reserve_layer_nums = self.reserve_layer_nums
         if not self.training:
             if self.use_global:
-                (cls_tokens, img_tokens), (token_attn, cls_token_attn, _) = self.prototype_distances(x, reserve_layer_nums)
-                global_activations, _ = self.get_activations(cls_tokens, self.prototype_vectors_global)
-                local_activations, (distances, _) = self.get_activations(img_tokens, self.prototype_vectors)
+                (cls_tokens, img_tokens), (token_attn, cls_token_attn, _), global_feat_prot_lorentz_distance, part_feat_prot_lorentz_distance = self.prototype_distances(x, reserve_layer_nums)
+                global_activations, (min_distances_global, _, _) = self.get_activations(cls_tokens, self.prototype_vectors_global, global_feat_prot_lorentz_distance, 'global')
+                local_activations, (min_distances_local, distances_local, total_proto_act) = self.get_activations(img_tokens, self.prototype_vectors, part_feat_prot_lorentz_distance, 'local')
+
+                # prototype_activations = torch.cat([local_activations, global_activations], dim=-1)
+                # logits = self.last_layer(prototype_activations)  # shape (N, num_classes)
 
                 logits_global = self.last_layer_global(global_activations)
                 logits_local = self.last_layer(local_activations)
                 logits = self.global_coe * logits_global + (1. - self.global_coe) * logits_local
-                return logits, (cls_token_attn, distances, logits_global, logits_local)
+                return logits, (cls_token_attn, distances_local, logits_global, logits_local)
 
         # re-calculate distances
         if self.use_global:
-            (cls_tokens, img_tokens), (student_token_attn, cls_attn_rollout, _) = self.prototype_distances(x, reserve_layer_nums)
+            (cls_tokens, img_tokens), (student_token_attn, cls_attn_rollout, _), global_feat_prot_lorentz_distance, part_feat_prot_lorentz_distance = self.prototype_distances(x, reserve_layer_nums)
             cls_attn_rollout = cls_attn_rollout.detach()    # detach
             # get token attention loss
             batch_size, fea_size, original_fea_size = cls_tokens.shape[0], img_tokens.shape[-1], int(cls_attn_rollout.shape[-1] ** (1/2))
             teacher_token_attn = cls_attn_rollout
 
-            global_activations, _ = self.get_activations(cls_tokens, self.prototype_vectors_global)
-            local_activations, (_, total_proto_act) = self.get_activations(img_tokens, self.prototype_vectors)
+            global_activations, (min_distances_global, _, _) = self.get_activations(cls_tokens, self.prototype_vectors_global, global_feat_prot_lorentz_distance, 'global')
+            local_activations, (min_distances_local, _, total_proto_act) = self.get_activations(img_tokens, self.prototype_vectors, part_feat_prot_lorentz_distance, 'local')
+
+            # prototype_activations = torch.cat([local_activations, global_activations], dim=-1)
+            # logits = self.last_layer(prototype_activations)  # shape (N, num_classes)
 
             logits_global = self.last_layer_global(global_activations)
             logits_local = self.last_layer(local_activations)
             logits = self.global_coe * logits_global + (1. - self.global_coe) * logits_local
         else:
-            distances, (student_token_attn, _, _) = self.prototype_distances(x, reserve_layer_nums)
+            distances, (student_token_attn, _, _), global_feat_prot_lorentz_distance, part_feat_prot_lorentz_distance = self.prototype_distances(x, reserve_layer_nums, 'local')
             # global min pooling
             batch_size, fea_size = distances.shape[0], distances.shape[-1]
             prototype_activations = self.distance_2_similarity(distances)   # (B, 2000, 9, 9)
@@ -332,14 +413,14 @@ class PPNet(nn.Module):
         # attn_loss = F.mse_loss(teacher_token_attn, student_token_attn, reduction='sum')
         original_fea_len = original_fea_size ** 2
 
-        return logits, (student_token_attn, attn_loss, total_proto_act, cls_attn_rollout, original_fea_len)
+        return logits, (student_token_attn, attn_loss, total_proto_act, cls_attn_rollout, original_fea_len), (min_distances_global, min_distances_local)
 
     def push_forward(self, x):
         '''this method is needed for the pushing operation'''
         reserve_layer_nums = self.reserve_layer_nums
-        (cls_tokens, img_tokens), (token_attn, cls_token_attn, _) = self.prototype_distances(x, reserve_layer_nums)
-        global_activations, _ = self.get_activations(cls_tokens, self.prototype_vectors_global)
-        local_activations, (distances, proto_acts) = self.get_activations(img_tokens, self.prototype_vectors)
+        (cls_tokens, img_tokens), (token_attn, cls_token_attn, _), global_feat_prot_lorentz_distance, part_feat_prot_lorentz_distance = self.prototype_distances(x, reserve_layer_nums)
+        global_activations, _, _ = self.get_activations(cls_tokens, self.prototype_vectors_global, global_feat_prot_lorentz_distance)
+        local_activations, (_, _, proto_acts) = self.get_activations(img_tokens, self.prototype_vectors, part_feat_prot_lorentz_distance)
 
         return cls_token_attn, proto_acts
 
@@ -373,6 +454,7 @@ class PPNet(nn.Module):
 
         correct_class_connection = 1
         incorrect_class_connection = incorrect_strength
+        # self.last_layer.weight[:,:self.num_prototypes].data.copy_(
         self.last_layer.weight.data.copy_(
             correct_class_connection * positive_one_weights_locations
             + incorrect_class_connection * negative_one_weights_locations)
@@ -384,12 +466,25 @@ class PPNet(nn.Module):
             self.last_layer_global.weight.data.copy_(
                 correct_class_connection * positive_one_weights_locations
                 + incorrect_class_connection * negative_one_weights_locations)
+        '''
+        positive_one_weights_locations = torch.t(self.prototype_class_identity_global)
+        negative_one_weights_locations = 1 - positive_one_weights_locations
+
+        self.last_layer.weight[:,self.num_prototypes:].data.copy_(
+            correct_class_connection * positive_one_weights_locations
+            + incorrect_class_connection * negative_one_weights_locations)
+        '''
 
     def _initialize_weights(self):
         for m in self.add_on_layers.modules():
             if isinstance(m, nn.Conv2d):
                 # every init technique has an underscore _ in the name
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                if self.feat_range_type == "Sigmoid":
+                    nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')  # for the relu and sigmoid
+                elif self.feat_range_type == "Tanh":
+                    nn.init.xavier_normal_(m.weight, gain=nn.init.calculate_gain('tanh'))  # for the tanh initialization
+                else:
+                    raise(ValueError(f"feat_range_type {self.feat_range_type} is not supported"))
 
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
@@ -399,6 +494,10 @@ class PPNet(nn.Module):
                 nn.init.constant_(m.bias, 0)
 
         self.set_last_layer_incorrect_connection(incorrect_strength=-0.5)
+
+    @property
+    def device(self) -> torch.device:
+        return self.curv.device
 
 
 class BaseNet(nn.Module):
@@ -456,12 +555,13 @@ def construct_PPNet(base_architecture, pretrained=True, img_size=224,
                     prototype_shape=(2000, 512, 1, 1), num_classes=200,
                     reserve_layers=[],
                     reserve_token_nums=[],
+                    feat_range_type="Sigmoid",  # can be "Tanh" or "Sigmoid"
                     use_global=False,
                     use_ppc_loss=False,
                     ppc_cov_thresh=1.,
                     ppc_mean_thresh=2.,
                     global_coe=0.5,
-                    global_proto_per_class=10,
+                    global_proto_per_class=1,
                     prototype_activation_function='log',
                     add_on_layers_type='bottleneck'):
     features = base_architecture_to_features[base_architecture](pretrained=pretrained)
@@ -476,6 +576,7 @@ def construct_PPNet(base_architecture, pretrained=True, img_size=224,
                  num_classes=num_classes,
                  reserve_layers=reserve_layers,
                  reserve_token_nums=reserve_token_nums,
+                 feat_range_type=feat_range_type,  # can be "Tanh" or "Sigmoid"
                  use_global=use_global,
                  use_ppc_loss=use_ppc_loss,
                  ppc_cov_thresh=ppc_cov_thresh,

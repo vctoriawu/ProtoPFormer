@@ -13,15 +13,23 @@ model=$1
 batch_size=$2
 num_gpus=$3
 
+wandb_mode="online" # one of "online", "offline" or "disabled"
+run_name="ProtoPFormer_Hyper-CARS-0"
+
 use_port=2673
 seed=1028
 
 # Learning Rate
 warmup_lr=1e-4
+min_lr=1e-6
 warmup_epochs=5
 features_lr=4e-4
 add_on_layers_lr=3e-3
 prototype_vectors_lr=3e-3
+last_layer_lr=1e-4
+last_layer_global_lr=1e-4
+curv_lr=5e-4
+visual_alpha_lr=5e-4
 
 # Optimizer & Scheduler
 opt=adamw
@@ -33,6 +41,9 @@ epochs=200
 output_dir=output_cosine/
 input_size=224
 
+prototype_activation_function="log"
+entailment_coe=0.2  # entailment loss coefficient
+feat_range_type="Sigmoid"   # can be "Tanh" or "Sigmoid"
 use_global=True
 use_ppc_loss=True       # Whether use PPC loss
 last_reserve_num=121    # Number of reserve tokens in the last layer
@@ -63,11 +74,13 @@ do
     data_path=datasets
     
     python -m torch.distributed.launch --nproc_per_node=$num_gpus --master_port=$use_port --use_env main.py \
+        --wandb_mode=$wandb_mode \
+        --run_name=$run_name \
         --base_architecture=$model \
         --data_set=$data_set \
         --data_path=$data_path \
         --input_size=$input_size \
-        --output_dir=$output_dir/$data_set/$model/$seed-$lr-$opt-$weight_decay-$epochs-$ft \
+        --output_dir=$output_dir/$data_set/$model/$run_name/$seed-$lr-$opt-$weight_decay-$epochs-$ft \
         --model=$model \
         --batch_size=$batch_size \
         --seed=$seed \
@@ -75,6 +88,7 @@ do
         --sched=$sched \
         --warmup-epochs=$warmup_epochs \
         --warmup-lr=$warmup_lr \
+        --min_lr=$min_lr \
         --decay-epochs=$decay_epochs \
         --decay-rate=$decay_rate \
         --weight_decay=$weight_decay \
@@ -83,10 +97,17 @@ do
         --features_lr=$features_lr \
         --add_on_layers_lr=$add_on_layers_lr \
         --prototype_vectors_lr=$prototype_vectors_lr \
+        --last_layer_lr=$last_layer_lr \
+        --last_layer_global_lr=$last_layer_global_lr \
+        --curv_lr=$curv_lr \
+        --visual_alpha_lr=$visual_alpha_lr \
         --prototype_shape $prototype_num $dim 1 1 \
         --reserve_layers $reserve_layer_idx \
         --reserve_token_nums $last_reserve_num \
+        --prototype_activation_function=$prototype_activation_function \
+        --entailment_coe=$entailment_coe \
         --use_global=$use_global \
+        --feat_range_type=$feat_range_type \
         --use_ppc_loss=$use_ppc_loss \
         --ppc_cov_thresh=$ppc_cov_thresh \
         --ppc_mean_thresh=$ppc_mean_thresh \
